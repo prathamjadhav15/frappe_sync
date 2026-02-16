@@ -1,0 +1,129 @@
+{
+	"actions": [],
+	"autoname": "field:connection_name",
+	"creation": "2026-02-16 10:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"connection_name",
+		"remote_url",
+		"site_name",
+		"column_break_auth",
+		"api_key",
+		"api_secret",
+		"section_break_status",
+		"enabled",
+		"status",
+		"column_break_status",
+		"remote_site_id",
+		"last_sync_at",
+		"section_break_actions",
+		"test_connection_button"
+	],
+	"fields": [
+		{
+			"fieldname": "connection_name",
+			"fieldtype": "Data",
+			"label": "Connection Name",
+			"reqd": 1,
+			"unique": 1
+		},
+		{
+			"fieldname": "remote_url",
+			"fieldtype": "Data",
+			"label": "Remote URL",
+			"reqd": 1,
+			"description": "e.g. https://site-b.example.com"
+		},
+		{
+			"fieldname": "site_name",
+			"fieldtype": "Data",
+			"label": "Site Name",
+			"description": "For multi-tenant setups: the remote site name (e.g. test.site). Used as Host header. Leave blank if not needed."
+		},
+		{
+			"fieldname": "column_break_auth",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "api_key",
+			"fieldtype": "Data",
+			"label": "API Key",
+			"reqd": 1
+		},
+		{
+			"fieldname": "api_secret",
+			"fieldtype": "Password",
+			"label": "API Secret",
+			"reqd": 1
+		},
+		{
+			"fieldname": "section_break_status",
+			"fieldtype": "Section Break",
+			"label": "Status"
+		},
+		{
+			"default": "1",
+			"fieldname": "enabled",
+			"fieldtype": "Check",
+			"label": "Enabled"
+		},
+		{
+			"default": "Disabled",
+			"fieldname": "status",
+			"fieldtype": "Select",
+			"label": "Status",
+			"options": "Active\nError\nDisabled",
+			"read_only": 1
+		},
+		{
+			"fieldname": "column_break_status",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "remote_site_id",
+			"fieldtype": "Data",
+			"label": "Remote Site ID",
+			"read_only": 1
+		},
+		{
+			"fieldname": "last_sync_at",
+			"fieldtype": "Datetime",
+			"label": "Last Sync At",
+			"read_only": 1
+		},
+		{
+			"fieldname": "section_break_actions",
+			"fieldtype": "Section Break"
+		},
+		{
+			"fieldname": "test_connection_button",
+			"fieldtype": "Button",
+			"label": "Test Connection"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"links": [],
+	"modified": "2026-02-16 10:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Frappe Sync",
+	"name": "Sync Connection",
+	"naming_rule": "By fieldname",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "creation",
+	"sort_order": "DESC"
+}

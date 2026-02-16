@@ -1,0 +1,76 @@
+{
+	"actions": [],
+	"creation": "2026-02-16 10:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"enabled",
+		"site_id",
+		"section_break_doctypes",
+		"synced_doctypes",
+		"section_break_cleanup",
+		"log_retention_days"
+	],
+	"fields": [
+		{
+			"default": "0",
+			"fieldname": "enabled",
+			"fieldtype": "Check",
+			"label": "Enabled"
+		},
+		{
+			"fieldname": "site_id",
+			"fieldtype": "Data",
+			"label": "Site ID",
+			"read_only": 1,
+			"description": "Unique identifier for this site. Auto-generated on install."
+		},
+		{
+			"fieldname": "section_break_doctypes",
+			"fieldtype": "Section Break",
+			"label": "DocTypes to Sync"
+		},
+		{
+			"fieldname": "synced_doctypes",
+			"fieldtype": "Table",
+			"label": "Synced DocTypes",
+			"options": "Sync DocType"
+		},
+		{
+			"fieldname": "section_break_cleanup",
+			"fieldtype": "Section Break",
+			"label": "Cleanup"
+		},
+		{
+			"default": "30",
+			"fieldname": "log_retention_days",
+			"fieldtype": "Int",
+			"label": "Log Retention (Days)",
+			"description": "Delete successful sync logs older than this many days."
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"issingle": 1,
+	"links": [],
+	"modified": "2026-02-16 10:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Frappe Sync",
+	"name": "Sync Settings",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"create": 1,
+			"delete": 1,
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1,
+			"write": 1
+		}
+	],
+	"sort_field": "creation",
+	"sort_order": "DESC"
+}

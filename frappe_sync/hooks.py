@@ -83,7 +83,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "frappe_sync.install.before_install"
-# after_install = "frappe_sync.install.after_install"
+after_install = "frappe_sync.frappe_sync.install.after_install"
 
 # Uninstallation
 # ------------
@@ -137,34 +137,27 @@ app_license = "mit"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"*": {
+		"after_insert": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+		"on_update": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+		"on_trash": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+	}
+}
 
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"frappe_sync.tasks.all"
-# 	],
-# 	"daily": [
-# 		"frappe_sync.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"frappe_sync.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"frappe_sync.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"frappe_sync.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"frappe_sync.frappe_sync.retry.process_failed_syncs",
+		],
+	},
+	"daily": [
+		"frappe_sync.frappe_sync.cleanup.cleanup_old_sync_logs",
+	],
+}
 
 # Testing
 # -------

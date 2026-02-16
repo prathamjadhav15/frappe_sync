@@ -1,0 +1,143 @@
+{
+	"actions": [],
+	"autoname": "hash",
+	"creation": "2026-02-16 10:00:00.000000",
+	"doctype": "DocType",
+	"engine": "InnoDB",
+	"field_order": [
+		"doctype_name",
+		"document_name",
+		"event",
+		"direction",
+		"column_break_info",
+		"sync_connection",
+		"status",
+		"origin_site_id",
+		"section_break_retry",
+		"retry_count",
+		"next_retry_at",
+		"column_break_retry",
+		"modified_timestamp",
+		"section_break_details",
+		"error",
+		"request_payload"
+	],
+	"fields": [
+		{
+			"fieldname": "doctype_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "DocType Name",
+			"reqd": 1
+		},
+		{
+			"fieldname": "document_name",
+			"fieldtype": "Data",
+			"in_list_view": 1,
+			"label": "Document Name",
+			"reqd": 1
+		},
+		{
+			"fieldname": "event",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Event",
+			"options": "Insert\nUpdate\nDelete"
+		},
+		{
+			"fieldname": "direction",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Direction",
+			"options": "Outgoing\nIncoming"
+		},
+		{
+			"fieldname": "column_break_info",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "sync_connection",
+			"fieldtype": "Link",
+			"in_standard_filter": 1,
+			"label": "Sync Connection",
+			"options": "Sync Connection"
+		},
+		{
+			"fieldname": "status",
+			"fieldtype": "Select",
+			"in_list_view": 1,
+			"in_standard_filter": 1,
+			"label": "Status",
+			"options": "Queued\nSuccess\nFailed\nSkipped"
+		},
+		{
+			"fieldname": "origin_site_id",
+			"fieldtype": "Data",
+			"label": "Origin Site ID"
+		},
+		{
+			"fieldname": "section_break_retry",
+			"fieldtype": "Section Break",
+			"label": "Retry Info"
+		},
+		{
+			"default": "0",
+			"fieldname": "retry_count",
+			"fieldtype": "Int",
+			"label": "Retry Count"
+		},
+		{
+			"fieldname": "next_retry_at",
+			"fieldtype": "Datetime",
+			"label": "Next Retry At"
+		},
+		{
+			"fieldname": "column_break_retry",
+			"fieldtype": "Column Break"
+		},
+		{
+			"fieldname": "modified_timestamp",
+			"fieldtype": "Datetime",
+			"label": "Modified Timestamp"
+		},
+		{
+			"fieldname": "section_break_details",
+			"fieldtype": "Section Break",
+			"collapsible": 1,
+			"label": "Details"
+		},
+		{
+			"fieldname": "error",
+			"fieldtype": "Long Text",
+			"label": "Error"
+		},
+		{
+			"fieldname": "request_payload",
+			"fieldtype": "JSON",
+			"label": "Request Payload"
+		}
+	],
+	"index_web_pages_for_search": 0,
+	"links": [],
+	"modified": "2026-02-16 10:00:00.000000",
+	"modified_by": "Administrator",
+	"module": "Frappe Sync",
+	"name": "Sync Log",
+	"owner": "Administrator",
+	"permissions": [
+		{
+			"email": 1,
+			"export": 1,
+			"print": 1,
+			"read": 1,
+			"report": 1,
+			"role": "System Manager",
+			"share": 1
+		}
+	],
+	"sort_field": "creation",
+	"sort_order": "DESC"
+}
