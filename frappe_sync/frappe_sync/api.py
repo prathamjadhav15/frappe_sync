@@ -126,13 +126,13 @@ def _handle_update(doc_data, modified_timestamp, log):
 		return
 
 	# Apply the remote changes
-	# Remove fields that shouldn't be overwritten
-	for key in ("name", "doctype", "creation", "owner"):
-		doc_data.pop(key, None)
+	# Remove fields that shouldn't be overwritten (use a copy to preserve original doc_data)
+	update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner")}
 
-	local_doc.update(doc_data)
+	local_doc.update(update_data)
 	local_doc.flags.ignore_permissions = True
 	local_doc.flags.ignore_links = True
+	local_doc.flags.ignore_version = True
 	local_doc.save()
 	log.db_set("status", "Success")
 

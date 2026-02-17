@@ -64,13 +64,13 @@ def on_document_change(doc, method):
 			queue="short",
 			doc_data=payload,
 			connection_name=connection.name,
-			event=event,
+			sync_event=event,
 			origin_site_id=origin_site_id,
 			modified_timestamp=str(doc.modified),
 		)
 
 
-def push_to_remote(doc_data, connection_name, event, origin_site_id, modified_timestamp):
+def push_to_remote(doc_data, connection_name, sync_event, origin_site_id, modified_timestamp):
 	"""Background job that pushes a document change to a remote Frappe instance."""
 	from frappe.frappeclient import FrappeClient
 
@@ -79,7 +79,7 @@ def push_to_remote(doc_data, connection_name, event, origin_site_id, modified_ti
 		"doctype_name": doc_data.get("doctype"),
 		"document_name": doc_data.get("name"),
 		"sync_connection": connection_name,
-		"event": event,
+		"event": sync_event,
 		"direction": "Outgoing",
 		"request_payload": frappe.as_json(doc_data),
 		"origin_site_id": origin_site_id,
@@ -102,7 +102,7 @@ def push_to_remote(doc_data, connection_name, event, origin_site_id, modified_ti
 		response = client.post_request({
 			"cmd": "frappe_sync.frappe_sync.api.receive_sync",
 			"doc_data": frappe.as_json(doc_data),
-			"event": event,
+			"event": sync_event,
 			"origin_site_id": origin_site_id,
 			"modified_timestamp": modified_timestamp,
 		})

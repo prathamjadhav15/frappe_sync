@@ -41,7 +41,7 @@ def _retry_sync(log_data):
 		push_to_remote(
 			doc_data=doc_data,
 			connection_name=log_data.sync_connection,
-			event=log_data.event,
+			sync_event=log_data.event,
 			origin_site_id=log_data.origin_site_id,
 			modified_timestamp=log_data.modified_timestamp,
 		)
