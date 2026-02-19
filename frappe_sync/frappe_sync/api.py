@@ -171,7 +171,7 @@ def _resolve_dependencies(dependencies, origin_site_id):
 	if not dependencies:
 		return
 
-	resolving = getattr(frappe.flags, "_sync_resolving_deps", set())
+	resolving = frappe.flags.get("_sync_resolving_deps") or set()
 
 	for dep in dependencies:
 		key = (dep["doctype"], dep["name"])
