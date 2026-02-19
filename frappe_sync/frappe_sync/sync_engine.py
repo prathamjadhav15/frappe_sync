@@ -122,6 +122,11 @@ def push_to_remote(doc_data, connection_name, sync_event, origin_site_id, modifi
 		except Exception:
 			pass
 
+		log.flags.ignore_permissions = True
+		log.insert()
+		frappe.db.commit()
+		raise
+
 	log.flags.ignore_permissions = True
 	log.insert()
 	frappe.db.commit()
