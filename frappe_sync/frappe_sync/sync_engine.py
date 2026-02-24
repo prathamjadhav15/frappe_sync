@@ -72,7 +72,7 @@ def on_document_change(doc, method):
 
 def push_to_remote(doc_data, connection_name, sync_event, origin_site_id, modified_timestamp):
 	"""Background job that pushes a document change to a remote Frappe instance."""
-	from frappe.frappeclient import FrappeClient
+	import requests as _requests
 
 	log = frappe.get_doc({
 		"doctype": "Sync Log",
@@ -88,24 +88,35 @@ def push_to_remote(doc_data, connection_name, sync_event, origin_site_id, modifi
 
 	try:
 		connection = frappe.get_doc("Sync Connection", connection_name)
+		api_secret = connection.get_password("api_secret")
+		base_url = connection.remote_url.rstrip("/")
 
-		client = FrappeClient(
-			url=connection.remote_url,
-			api_key=connection.api_key,
-			api_secret=connection.get_password("api_secret"),
-		)
+		headers = {
+			"Authorization": f"token {connection.api_key}:{api_secret}",
+			"Content-Type": "application/x-www-form-urlencoded",
+			"Accept": "application/json",
+		}
 
 		# For multi-tenant setups, set the Host header to route to the correct site
 		if connection.site_name:
-			client.headers["Host"] = connection.site_name
+			headers["Host"] = connection.site_name
 
-		response = client.post_request({
-			"cmd": "frappe_sync.frappe_sync.api.receive_sync",
-			"doc_data": frappe.as_json(doc_data),
-			"event": sync_event,
-			"origin_site_id": origin_site_id,
-			"modified_timestamp": modified_timestamp,
-		})
+		resp = _requests.post(
+			f"{base_url}/api/method/frappe_sync.frappe_sync.api.receive_sync",
+			headers=headers,
+			data={
+				"doc_data": frappe.as_json(doc_data),
+				"event": sync_event,
+				"origin_site_id": origin_site_id,
+				"modified_timestamp": modified_timestamp,
+			},
+			timeout=30,
+		)
+
+		if resp.status_code != 200:
+			raise Exception(f"HTTP {resp.status_code}: {resp.text[:500]}")
+
+		response = resp.json().get("message") or {}
 
 		log.status = "Success"
 		connection.db_set("last_sync_at", frappe.utils.now_datetime())
