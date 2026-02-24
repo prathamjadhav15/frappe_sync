@@ -14,11 +14,14 @@ class SyncConnection(Document):
 
 
 @frappe.whitelist()
-def test_connection(doc_name):
+def test_connection(doc_name=None):
 	"""Test connectivity to the remote Frappe instance and fetch its site_id.
 
 	Defined as a module-level function for compatibility with Frappe v15 and v16.
 	"""
+	if not doc_name:
+		frappe.throw(_("doc_name is required to test connection."))
+
 	doc = frappe.get_doc("Sync Connection", doc_name)
 
 	try:
