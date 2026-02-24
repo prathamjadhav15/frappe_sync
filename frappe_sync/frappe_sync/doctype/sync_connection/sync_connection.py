@@ -12,18 +12,23 @@ class SyncConnection(Document):
 		elif self.status == "Disabled" and self.enabled:
 			self.status = "Active" if self.remote_site_id else "Disabled"
 
+	@frappe.whitelist()
+	def test_connection(self):
+		"""Entry point for Frappe v15 frm.call (run_doc_method) compatibility."""
+		_do_test_connection(self)
+
 
 @frappe.whitelist()
 def test_connection(doc_name=None):
-	"""Test connectivity to the remote Frappe instance and fetch its site_id.
-
-	Defined as a module-level function for compatibility with Frappe v15 and v16.
-	"""
+	"""Entry point for Frappe v16 frappe.call (full module path) compatibility."""
 	if not doc_name:
 		frappe.throw(_("doc_name is required to test connection."))
-
 	doc = frappe.get_doc("Sync Connection", doc_name)
+	_do_test_connection(doc)
 
+
+def _do_test_connection(doc):
+	"""Shared implementation — tests connectivity and updates status."""
 	try:
 		base_url = doc.remote_url.rstrip("/")
 		api_secret = doc.get_password("api_secret")
