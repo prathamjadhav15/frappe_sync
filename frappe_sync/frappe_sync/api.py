@@ -91,6 +91,7 @@ def _handle_insert(doc_data, log):
 	new_doc.flags.ignore_permissions = True
 	new_doc.flags.ignore_links = True
 	new_doc.flags.ignore_mandatory = True
+	new_doc.flags.ignore_validate = True
 	# Preserve the original document name from the source site
 	if name:
 		new_doc.name = name
@@ -133,6 +134,7 @@ def _handle_update(doc_data, modified_timestamp, log):
 	local_doc.flags.ignore_permissions = True
 	local_doc.flags.ignore_links = True
 	local_doc.flags.ignore_version = True
+	local_doc.flags.ignore_validate = True
 	local_doc.save()
 	log.db_set("status", "Success")
 
