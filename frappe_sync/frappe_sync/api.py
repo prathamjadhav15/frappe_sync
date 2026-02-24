@@ -42,6 +42,10 @@ def receive_sync(doc_data, event, origin_site_id, modified_timestamp):
 			_handle_insert(doc_data, log)
 		elif event == "Update":
 			_handle_update(doc_data, modified_timestamp, log)
+		elif event == "Submit":
+			_handle_submit(doc_data, log)
+		elif event == "Cancel":
+			_handle_cancel(doc_data, log)
 		elif event == "Delete":
 			_handle_delete(doctype, name, log)
 
@@ -81,13 +85,16 @@ def _handle_insert(doc_data, log):
 	"""Handle an incoming insert event."""
 	doctype = doc_data.get("doctype")
 	name = doc_data.get("name")
+	docstatus = doc_data.get("docstatus", 0)
 
 	if frappe.db.exists(doctype, name):
 		# Document already exists, treat as update
 		_handle_update(doc_data, doc_data.get("modified"), log)
 		return
 
-	new_doc = frappe.get_doc(doc_data)
+	# Always insert as draft; docstatus is applied separately via db.set_value
+	insert_data = {k: v for k, v in doc_data.items() if k != "docstatus"}
+	new_doc = frappe.get_doc(insert_data)
 	new_doc.flags.ignore_permissions = True
 	new_doc.flags.ignore_links = True
 	new_doc.flags.ignore_mandatory = True
@@ -97,6 +104,12 @@ def _handle_insert(doc_data, log):
 		new_doc.name = name
 		new_doc.flags.name_set = True
 	new_doc.insert()
+
+	# Restore docstatus directly to avoid triggering on_submit/on_cancel side effects
+	# (e.g. GL entries for financial doctypes)
+	if docstatus in (1, 2):
+		frappe.db.set_value(doctype, name, "docstatus", docstatus, update_modified=False)
+
 	log.db_set("status", "Success")
 
 
@@ -130,12 +143,57 @@ def _handle_update(doc_data, modified_timestamp, log):
 	# Remove fields that shouldn't be overwritten (use a copy to preserve original doc_data)
 	update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner")}
 
-	local_doc.update(update_data)
-	local_doc.flags.ignore_permissions = True
-	local_doc.flags.ignore_links = True
-	local_doc.flags.ignore_version = True
-	local_doc.flags.ignore_validate = True
-	local_doc.save()
+	if local_doc.docstatus == 1:
+		# Submitted documents cannot be saved normally — update scalar fields directly
+		# to avoid triggering accounting/GL side effects via doc.save()
+		scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
+		if scalar_updates:
+			frappe.db.set_value(local_doc.doctype, local_doc.name, scalar_updates, update_modified=False)
+	else:
+		local_doc.update(update_data)
+		local_doc.flags.ignore_permissions = True
+		local_doc.flags.ignore_links = True
+		local_doc.flags.ignore_version = True
+		local_doc.flags.ignore_validate = True
+		local_doc.save()
+
+	log.db_set("status", "Success")
+
+
+def _handle_submit(doc_data, log):
+	"""Handle an incoming submit event — mirrors docstatus=1 without triggering GL entries."""
+	doctype = doc_data.get("doctype")
+	name = doc_data.get("name")
+
+	if not frappe.db.exists(doctype, name):
+		# Insert as draft first, then mark submitted
+		_handle_insert(doc_data, log)
+		return
+
+	current_docstatus = frappe.db.get_value(doctype, name, "docstatus")
+	if current_docstatus == 0:
+		# Update fields then set docstatus=1 directly to avoid GL/side-effect triggers
+		update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner", "docstatus")}
+		scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
+		scalar_updates["docstatus"] = 1
+		frappe.db.set_value(doctype, name, scalar_updates, update_modified=False)
+
+	log.db_set("status", "Success")
+
+
+def _handle_cancel(doc_data, log):
+	"""Handle an incoming cancel event — mirrors docstatus=2 without triggering reversal entries."""
+	doctype = doc_data.get("doctype")
+	name = doc_data.get("name")
+
+	if not frappe.db.exists(doctype, name):
+		log.db_set("status", "Skipped")
+		return
+
+	current_docstatus = frappe.db.get_value(doctype, name, "docstatus")
+	if current_docstatus == 1:
+		frappe.db.set_value(doctype, name, "docstatus", 2, update_modified=False)
+
 	log.db_set("status", "Success")
 
 

@@ -27,6 +27,9 @@ def is_sync_enabled_for_doctype(doctype_name, event):
 	event_field_map = {
 		"after_insert": "sync_insert",
 		"on_update": "sync_update",
+		"on_submit": "sync_update",
+		"on_cancel": "sync_update",
+		"on_update_after_submit": "sync_update",
 		"on_trash": "sync_delete",
 	}
 	field = event_field_map.get(event)
@@ -69,7 +72,6 @@ def prepare_doc_payload(doc, event):
 		"_assign",
 		"_user_tags",
 		"_seen",
-		"docstatus",
 		"modified",
 		"modified_by",
 	}
@@ -121,6 +123,9 @@ def get_event_type(method):
 	mapping = {
 		"after_insert": "Insert",
 		"on_update": "Update",
+		"on_submit": "Submit",
+		"on_cancel": "Cancel",
+		"on_update_after_submit": "Update",
 		"on_trash": "Delete",
 	}
 	return mapping.get(method, "Update")

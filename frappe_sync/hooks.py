@@ -141,6 +141,9 @@ doc_events = {
 	"*": {
 		"after_insert": "frappe_sync.frappe_sync.sync_engine.on_document_change",
 		"on_update": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+		"on_submit": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+		"on_cancel": "frappe_sync.frappe_sync.sync_engine.on_document_change",
+		"on_update_after_submit": "frappe_sync.frappe_sync.sync_engine.on_document_change",
 		"on_trash": "frappe_sync.frappe_sync.sync_engine.on_document_change",
 	}
 }
