@@ -82,31 +82,30 @@ def get_document(doctype, name):
 
 
 def _handle_insert(doc_data, log):
-	"""Handle an incoming insert event."""
+	"""Handle an incoming insert event using direct DB writes to bypass all controller hooks."""
 	doctype = doc_data.get("doctype")
 	name = doc_data.get("name")
 	docstatus = doc_data.get("docstatus", 0)
 
 	if frappe.db.exists(doctype, name):
-		# Document already exists, treat as update
 		_handle_update(doc_data, doc_data.get("modified"), log)
 		return
 
-	# Always insert as draft; docstatus is applied separately via db.set_value
-	insert_data = {k: v for k, v in doc_data.items() if k != "docstatus"}
-	new_doc = frappe.get_doc(insert_data)
-	new_doc.flags.ignore_permissions = True
-	new_doc.flags.ignore_links = True
-	new_doc.flags.ignore_mandatory = True
-	new_doc.flags.ignore_validate = True
-	# Preserve the original document name from the source site
+	# Build scalar fields only (child tables handled separately)
+	scalar_data = {k: v for k, v in doc_data.items() if not isinstance(v, list) and k != "docstatus"}
+
+	new_doc = frappe.new_doc(doctype)
+	new_doc.update(scalar_data)
 	if name:
 		new_doc.name = name
 		new_doc.flags.name_set = True
-	new_doc.insert()
+	# Direct DB insert — bypasses all controller hooks (before_validate, validate, etc.)
+	new_doc.db_insert()
 
-	# Restore docstatus directly to avoid triggering on_submit/on_cancel side effects
-	# (e.g. GL entries for financial doctypes)
+	# Sync child tables directly
+	_sync_child_tables(doctype, name, doc_data)
+
+	# Set docstatus via db.set_value to avoid triggering on_submit/on_cancel side effects
 	if docstatus in (1, 2):
 		frappe.db.set_value(doctype, name, "docstatus", docstatus, update_modified=False)
 
@@ -114,48 +113,34 @@ def _handle_insert(doc_data, log):
 
 
 def _handle_update(doc_data, modified_timestamp, log):
-	"""Handle an incoming update event with last-write-wins conflict resolution."""
+	"""Handle an incoming update event using direct DB writes to bypass all controller hooks."""
 	doctype = doc_data.get("doctype")
 	name = doc_data.get("name")
 
 	if not frappe.db.exists(doctype, name):
-		# Document doesn't exist locally, treat as insert
 		_handle_insert(doc_data, log)
 		return
 
 	conflict_strategy = get_conflict_strategy(doctype)
-	local_doc = frappe.get_doc(doctype, name)
+	local_modified = frappe.db.get_value(doctype, name, "modified")
 
 	if conflict_strategy == "Last Write Wins":
-		local_modified = str(local_doc.modified)
-		remote_modified = str(modified_timestamp)
-
-		if remote_modified < local_modified:
-			# Local is newer, skip
+		if str(modified_timestamp) < str(local_modified):
 			log.db_set("status", "Skipped")
 			return
-
 	elif conflict_strategy == "Skip":
 		log.db_set("status", "Skipped")
 		return
 
-	# Apply the remote changes
-	# Remove fields that shouldn't be overwritten (use a copy to preserve original doc_data)
 	update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner")}
 
-	if local_doc.docstatus == 1:
-		# Submitted documents cannot be saved normally — update scalar fields directly
-		# to avoid triggering accounting/GL side effects via doc.save()
-		scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
-		if scalar_updates:
-			frappe.db.set_value(local_doc.doctype, local_doc.name, scalar_updates, update_modified=False)
-	else:
-		local_doc.update(update_data)
-		local_doc.flags.ignore_permissions = True
-		local_doc.flags.ignore_links = True
-		local_doc.flags.ignore_version = True
-		local_doc.flags.ignore_validate = True
-		local_doc.save()
+	# Always use direct DB writes — never doc.save() — to avoid ERPNext's before_validate
+	# firing for financial doctypes (Purchase Invoice, Sales Invoice, etc.)
+	scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
+	if scalar_updates:
+		frappe.db.set_value(doctype, name, scalar_updates, update_modified=False)
+
+	_sync_child_tables(doctype, name, update_data)
 
 	log.db_set("status", "Success")
 
@@ -195,6 +180,57 @@ def _handle_cancel(doc_data, log):
 		frappe.db.set_value(doctype, name, "docstatus", 2, update_modified=False)
 
 	log.db_set("status", "Success")
+
+
+def _sync_child_tables(parent_doctype, parent_name, doc_data):
+	"""Sync child table rows via direct DB operations, bypassing all controller hooks."""
+	for df in frappe.get_meta(parent_doctype).get_table_fields():
+		if df.fieldname not in doc_data:
+			continue
+
+		rows = doc_data.get(df.fieldname) or []
+		child_doctype = df.options
+
+		existing = {
+			r.name
+			for r in frappe.get_all(
+				child_doctype,
+				filters={"parent": parent_name, "parentfield": df.fieldname},
+				fields=["name"],
+			)
+		}
+		incoming = {r.get("name") for r in rows if r.get("name")}
+
+		# Delete rows removed on the source
+		for row_name in existing - incoming:
+			frappe.db.delete(child_doctype, {"name": row_name})
+
+		# Upsert incoming rows
+		for idx, row_data in enumerate(rows, start=1):
+			if hasattr(row_data, "as_dict"):
+				row_data = row_data.as_dict()
+
+			row_name = row_data.get("name")
+			# Skip nested child-of-child lists
+			clean = {k: v for k, v in row_data.items() if not isinstance(v, list)}
+			clean.update({
+				"parent": parent_name,
+				"parenttype": parent_doctype,
+				"parentfield": df.fieldname,
+				"idx": idx,
+			})
+
+			if row_name and row_name in existing:
+				child_doc = frappe.get_doc(child_doctype, row_name)
+				child_doc.update(clean)
+				child_doc.db_update()
+			else:
+				child_doc = frappe.new_doc(child_doctype)
+				child_doc.update(clean)
+				if row_name:
+					child_doc.name = row_name
+					child_doc.flags.name_set = True
+				child_doc.db_insert()
 
 
 def _handle_delete(doctype, name, log):
