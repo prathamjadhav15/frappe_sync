@@ -180,9 +180,13 @@ def _handle_cancel(doc_data, log):
 		log.db_set("status", "Skipped")
 		return
 
-	current_docstatus = frappe.db.get_value(doctype, name, "docstatus")
-	if current_docstatus == 1:
-		frappe.db.set_value(doctype, name, "docstatus", 2, update_modified=False)
+	local_doc = frappe.get_doc(doctype, name)
+	for key, value in doc_data.items():
+		if key not in ("name", "doctype") and not isinstance(value, list):
+			local_doc.set(key, value)
+	local_doc.docstatus = 2
+	local_doc.db_update()
+	_sync_child_tables(doctype, name, doc_data)
 
 	log.db_set("status", "Success")
 
