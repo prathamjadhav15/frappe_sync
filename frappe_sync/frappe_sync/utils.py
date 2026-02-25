@@ -72,8 +72,6 @@ def prepare_doc_payload(doc, event):
 		"_assign",
 		"_user_tags",
 		"_seen",
-		"modified",
-		"modified_by",
 	}
 
 	payload = doc.as_dict()
