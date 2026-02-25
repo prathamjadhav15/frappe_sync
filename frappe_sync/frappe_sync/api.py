@@ -132,15 +132,17 @@ def _handle_update(doc_data, modified_timestamp, log):
 		log.db_set("status", "Skipped")
 		return
 
-	update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner")}
+	# Load the existing doc and apply incoming scalar values.
+	# db_update() uses get_valid_dict() internally, so only real DB columns are written —
+	# this avoids SQL "Unknown column" errors from meta-fields (__onload, _user_tags, etc.)
+	# that frappe.db.set_value(dict) would blindly include.
+	local_doc = frappe.get_doc(doctype, name)
+	for key, value in doc_data.items():
+		if key not in ("name", "doctype") and not isinstance(value, list):
+			local_doc.set(key, value)
+	local_doc.db_update()
 
-	# Always use direct DB writes — never doc.save() — to avoid ERPNext's before_validate
-	# firing for financial doctypes (Purchase Invoice, Sales Invoice, etc.)
-	scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
-	if scalar_updates:
-		frappe.db.set_value(doctype, name, scalar_updates, update_modified=False)
-
-	_sync_child_tables(doctype, name, update_data)
+	_sync_child_tables(doctype, name, doc_data)
 
 	log.db_set("status", "Success")
 
@@ -157,11 +159,14 @@ def _handle_submit(doc_data, log):
 
 	current_docstatus = frappe.db.get_value(doctype, name, "docstatus")
 	if current_docstatus == 0:
-		# Update fields then set docstatus=1 directly to avoid GL/side-effect triggers
-		update_data = {k: v for k, v in doc_data.items() if k not in ("name", "doctype", "creation", "owner", "docstatus")}
-		scalar_updates = {k: v for k, v in update_data.items() if not isinstance(v, list)}
-		scalar_updates["docstatus"] = 1
-		frappe.db.set_value(doctype, name, scalar_updates, update_modified=False)
+		# Update all fields + flip docstatus to 1 via db_update (safe column filtering)
+		local_doc = frappe.get_doc(doctype, name)
+		for key, value in doc_data.items():
+			if key not in ("name", "doctype") and not isinstance(value, list):
+				local_doc.set(key, value)
+		local_doc.docstatus = 1
+		local_doc.db_update()
+		_sync_child_tables(doctype, name, doc_data)
 
 	log.db_set("status", "Success")
 
