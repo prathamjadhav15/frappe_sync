@@ -153,6 +153,9 @@ doc_events = {
 
 scheduler_events = {
 	"cron": {
+		"* * * * *": [
+			"frappe_sync.frappe_sync.sync_engine.pull_from_remotes",
+		],
 		"*/5 * * * *": [
 			"frappe_sync.frappe_sync.retry.process_failed_syncs",
 		],

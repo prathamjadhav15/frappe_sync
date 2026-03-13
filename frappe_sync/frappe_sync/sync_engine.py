@@ -59,6 +59,11 @@ def on_document_change(doc, method):
 		if connection.remote_site_id == origin_site_id:
 			continue
 
+		# Skip push for Pull-only connections (they poll us instead)
+		sync_mode = frappe.db.get_value("Sync Connection", connection.name, "sync_mode") or "Push"
+		if sync_mode == "Pull":
+			continue
+
 		frappe.enqueue(
 			"frappe_sync.frappe_sync.sync_engine.push_to_remote",
 			queue="short",
@@ -141,6 +146,113 @@ def push_to_remote(doc_data, connection_name, sync_event, origin_site_id, modifi
 	log.flags.ignore_permissions = True
 	log.insert()
 	frappe.db.commit()
+
+
+def pull_from_remotes():
+	"""Scheduler entry point: enqueue a pull job for every Pull-mode connection."""
+	settings = get_sync_settings()
+	if not settings.enabled:
+		return
+
+	connections = frappe.get_all(
+		"Sync Connection",
+		filters={"enabled": 1, "sync_mode": ("in", ("Pull", "Push & Pull"))},
+		fields=["name"],
+	)
+	for conn in connections:
+		frappe.enqueue(
+			"frappe_sync.frappe_sync.sync_engine.pull_from_remote",
+			connection_name=conn.name,
+			queue="short",
+		)
+
+
+def pull_from_remote(connection_name):
+	"""Background job: poll a remote server for changes and apply them locally."""
+	import requests as _requests
+
+	from frappe_sync.frappe_sync.api import _handle_cancel, _handle_insert, _handle_update, _handle_submit, _create_sync_log, _resolve_dependencies
+
+	connection = frappe.get_doc("Sync Connection", connection_name)
+	api_secret = connection.get_password("api_secret")
+	base_url = connection.remote_url.rstrip("/")
+	since = connection.last_pull_at or "2000-01-01 00:00:00"
+
+	headers = {
+		"Authorization": f"token {connection.api_key}:{api_secret}",
+		"Accept": "application/json",
+	}
+	if connection.site_name:
+		headers["Host"] = connection.site_name
+
+	try:
+		resp = _requests.get(
+			f"{base_url}/api/method/frappe_sync.frappe_sync.api.get_changes_since",
+			headers=headers,
+			params={"since_timestamp": str(since)},
+			timeout=30,
+		)
+
+		if resp.status_code != 200:
+			raise Exception(f"HTTP {resp.status_code}: {resp.text[:500]}")
+
+		changes = resp.json().get("message") or []
+
+		frappe.flags.in_frappe_sync = True
+		origin_site_id = connection.remote_site_id
+		last_timestamp = None
+
+		for item in changes:
+			doc_data = item.get("doc_data") or {}
+			if isinstance(doc_data, str):
+				doc_data = frappe.parse_json(doc_data)
+
+			modified_timestamp = item.get("modified_timestamp")
+			dependencies = doc_data.pop("_dependencies", [])
+			doctype = doc_data.get("doctype")
+			name = doc_data.get("name")
+			docstatus = doc_data.get("docstatus", 0)
+
+			# Determine the right event from current docstatus
+			if docstatus == 1:
+				event = "Submit"
+			elif docstatus == 2:
+				event = "Cancel"
+			else:
+				event = "Update"
+
+			log = _create_sync_log(doctype, name, event, "Incoming", origin_site_id, modified_timestamp)
+			_resolve_dependencies(dependencies, origin_site_id)
+
+			try:
+				if event == "Submit":
+					_handle_submit(doc_data, log)
+				elif event == "Cancel":
+					_handle_cancel(doc_data, log)
+				else:
+					_handle_update(doc_data, modified_timestamp, log)
+				frappe.db.commit()
+				last_timestamp = modified_timestamp
+			except Exception:
+				frappe.db.rollback()
+				log.db_set("status", "Failed")
+				log.db_set("error", frappe.get_traceback())
+				frappe.db.commit()
+
+		if last_timestamp:
+			connection.db_set("last_pull_at", last_timestamp)
+
+		connection.db_set("status", "Active")
+
+	except Exception:
+		try:
+			connection.db_set("status", "Error")
+		except Exception:
+			pass
+		frappe.log_error(title="Pull Sync Failed", message=frappe.get_traceback())
+
+	finally:
+		frappe.flags.in_frappe_sync = False
 
 
 def _calculate_next_retry(retry_count):

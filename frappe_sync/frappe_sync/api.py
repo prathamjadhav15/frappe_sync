@@ -72,6 +72,49 @@ def receive_sync(doc_data, event, origin_site_id, modified_timestamp):
 
 
 @frappe.whitelist()
+def get_changes_since(since_timestamp):
+	"""Return recently modified documents for all synced doctypes.
+
+	Called by remote sites in Pull mode to fetch changes they missed.
+	Returns up to 100 changes ordered oldest-first so the caller can
+	track progress with last_pull_at.
+	"""
+	from frappe_sync.frappe_sync.utils import get_sync_settings, prepare_doc_payload
+
+	settings = get_sync_settings()
+	changes = []
+
+	for row in settings.synced_doctypes:
+		if not (row.sync_insert or row.sync_update):
+			continue
+
+		docs = frappe.get_all(
+			row.doctype_name,
+			filters={"modified": (">", since_timestamp)},
+			fields=["name", "modified"],
+			order_by="modified asc",
+			limit=100,
+		)
+
+		for d in docs:
+			try:
+				doc = frappe.get_doc(row.doctype_name, d.name)
+				payload = prepare_doc_payload(doc, "Update")
+				changes.append({
+					"modified_timestamp": str(d.modified),
+					"doc_data": payload,
+				})
+			except Exception:
+				frappe.log_error(
+					title="Pull Sync Payload Error",
+					message=frappe.get_traceback(),
+				)
+
+	changes.sort(key=lambda x: x["modified_timestamp"])
+	return changes[:100]
+
+
+@frappe.whitelist()
 def get_document(doctype, name):
 	"""Fetch a document for dependency resolution by a remote instance."""
 	if not frappe.db.exists(doctype, name):
