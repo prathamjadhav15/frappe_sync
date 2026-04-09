@@ -44,13 +44,18 @@ def is_sync_enabled_for_doctype(doctype_name, event):
 
 
 def get_sync_fields_for_doctype(doctype_name):
-	"""Return list of fieldnames to sync for a doctype, or empty list (= sync all fields)."""
-	settings = get_sync_settings()
-	for row in settings.synced_doctypes:
-		if row.doctype_name == doctype_name:
-			raw = (row.sync_fields or "").strip()
-			if raw:
-				return [f.strip() for f in raw.split(",") if f.strip()]
+	"""Return list of fieldnames to sync for a doctype, or empty list (= sync all fields).
+
+	Uses a direct DB query to always get the latest value, bypassing the doc cache
+	so background workers see changes saved after the worker started.
+	"""
+	raw = frappe.db.get_value(
+		"Sync DocType",
+		{"doctype_name": doctype_name, "parenttype": "Sync Settings"},
+		"sync_fields",
+	)
+	if raw:
+		return [f.strip() for f in raw.split(",") if f.strip()]
 	return []
 
 
