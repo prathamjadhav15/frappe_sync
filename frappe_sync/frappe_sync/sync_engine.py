@@ -195,7 +195,7 @@ def pull_from_remote(connection_name):
 	"""Background job: poll a remote server for changes and apply them locally."""
 	import requests as _requests
 
-	from frappe_sync.frappe_sync.api import _handle_cancel, _handle_insert, _handle_update, _handle_submit, _create_sync_log, _resolve_dependencies
+	from frappe_sync.frappe_sync.api import _handle_cancel, _handle_delete, _handle_insert, _handle_update, _handle_submit, _create_sync_log, _resolve_dependencies
 
 	connection = frappe.get_doc("Sync Connection", connection_name)
 	api_secret = connection.get_password("api_secret")
